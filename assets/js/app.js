@@ -1,6 +1,6 @@
 // set the dimensions and margins of the graph
-var svgWidth = window.innerWidth * .5;
-var svgHeight = window.innerHeight * .5;
+var svgWidth = window.innerWidth * .75;
+var svgHeight = window.innerHeight * .75;
 
 var margin = {
   top: 100,
@@ -25,7 +25,7 @@ var chartGroup = svg.append("g")
 
 // Initial Params
 var chosenXAxis = "poverty";
-var chosenYAxis = "healthcare";
+var chosenYAxis = "obesity";
 
 // function used for updating x-scale var upon click on axis label
 function xScale(stateData, chosenXAxis) {
@@ -57,6 +57,82 @@ function yScale(stateData, chosenYAxis) {
   return yLinearScale;
 
 }
+function calcLinear(values_x, values_y){
+  var sum_x = 0;
+  var sum_y = 0;
+  var sum_xy = 0;
+  var sum_xx = 0;
+  var sum_yy = 0;
+  var count = 0;
+
+  /*
+   * We'll use those variables for faster read/write access.
+   */
+  var x = 0;
+  var y = 0;
+  var values_length = values_x.length;
+
+  if (values_length != values_y.length) {
+      throw new Error('The parameters values_x and values_y need to have same size!');
+  }
+
+  /*
+   * Nothing to do.
+   */
+  if (values_length === 0) {
+      return [ [], [] ];
+  }
+
+  /*
+   * Calculate the sum for each of the parts necessary.
+   */
+  for (var v = 0; v < values_length; v++) {
+      x = values_x[v];
+      y = values_y[v];
+      sum_x += x;
+      sum_y += y;
+      sum_xx += x*x;
+      sum_yy += y*y;
+      sum_xy += x*y;
+      count++;
+  }
+
+  /*
+   * Calculate m and b for the formula:
+   * y = x * m + b
+   */
+  var m = ((sum_x/count)*(sum_y/count) - sum_xy/count) / ((sum_x/count)*(sum_x/count) - (sum_xx/count));
+  var b = (sum_y/count) - (m*(sum_x/count));
+  
+
+  /*
+   * We will make the x and y result line now
+   */
+  var result_values_x = [];
+  var result_values_y = [];
+  var seLine = 0;
+  var seY = 0;
+
+  for (var v = 0; v < values_length; v++) {
+      x = values_x[v];
+      y = values_y[v];
+      yr = x * m + b;
+      seLine += (y-yr)*(y-yr);
+      seY += (y-(sum_y/count))*(y-(sum_y/count));
+
+      result_values_x.push(x);
+      result_values_y.push(yr);
+  }
+
+  var r2 = Math.pow((count*sum_xy - sum_x*sum_y)/Math.sqrt((count*sum_xx-sum_x*sum_x)*(count*sum_yy-sum_y*sum_y)),2);
+  // return [d3.min(result_values_x),d3.min(result_values_y), d3.max(result_values_x),d3.max(result_values_y), r2];
+  return[
+    {"x":d3.min(result_values_x),"y":d3.min(result_values_y)},
+    {"x":d3.max(result_values_x),"y":d3.max(result_values_y)}
+    ,r2
+  ]
+  
+}
 
 // function used for updating axes var upon click on axis label
 function renderXAxis(newXScale, xAxis) {
@@ -79,87 +155,6 @@ function renderYAxis(newYScale,yAxis) {
   return yAxis;
 }
 
-function trendlineAdd(data) {
-  console.log(data);
-  // returns slope, intercept and r-square of the line
-      function leastSquares(xSeries, ySeries) {
-        var reduceSumFunc = function(prev, cur) { return prev + cur; };
-        
-        var xBar = xSeries.reduce(reduceSumFunc) * 1.0 / xSeries.length;
-        var yBar = ySeries.reduce(reduceSumFunc) * 1.0 / ySeries.length;
-    
-        var ssXX = xSeries.map(function(d) { return Math.pow(d - xBar, 2); })
-          .reduce(reduceSumFunc);
-        
-        var ssYY = ySeries.map(function(d) { return Math.pow(d - yBar, 2); })
-          .reduce(reduceSumFunc);
-          
-        var ssXY = xSeries.map(function(d, i) { return (d - xBar) * (ySeries[i] - yBar); })
-          .reduce(reduceSumFunc);
-          
-        var slope = ssXY / ssXX;
-        var intercept = yBar - (xBar * slope);
-        var rSquare = Math.pow(ssXY, 2) / (ssXX * ssYY);
-        
-        return [slope, intercept, rSquare];
-      }
-  		// extract the x labels for the axis and scale domain
-      var xLabels = data.map(d => d[chosenXAxis]);
-	
-      // xScale.domain(xLabels);
-      // yScale.domain([0, Math.round(d3.max(data, d => d[chosenYAxis]))]);
-      
-      var line = d3.line()
-        .x(d => xScale(d[chosenXAxis]))
-        .y(d => yScale(d[chosenYAxis]));
-      
-      svg.append("path")
-        .datum(data)
-        .attr("class","line")
-        .attr("d", line);
-
-      
-      // get the x and y values for least squares
-      var xSeries = d3.range(1, xLabels.length + 1);
-      var ySeries = data.map(d => d[chosenYAxis]);
-      
-      var leastSquaresCoeff = leastSquares(xLabels, ySeries);
-      
-      // apply the reults of the least squares regression
-      var x1 = xLabels[0];
-      var y1 = leastSquaresCoeff[0] + leastSquaresCoeff[1];
-      var x2 = xLabels[xLabels.length - 1];
-      var y2 = leastSquaresCoeff[0] * xSeries.length + leastSquaresCoeff[1];
-      var trendData = [[x1,y1,x2,y2]];
-      
-      var trendline = svg.selectAll(".trendline")
-        .data(trendData);
-        
-      trendline.enter()
-        .append("line")
-        .attr("class", "trendline")
-        .attr("x1", function(d) { return xScale(d[0]); })
-        .attr("y1", function(d) { return yScale(d[1]); })
-        .attr("x2", function(d) { return xScale(d[2]); })
-        .attr("y2", function(d) { return yScale(d[3]); })
-        .attr("stroke", "black")
-        .attr("stroke-width", 1);
-      
-      // display equation on the chart
-      svg.append("text")
-        .text(`eq: ${leastSquaresCoeff[0]} x: ${leastSquaresCoeff[1]}`)
-        .attr("class", "text-label")
-        .attr("x", function(d) {return xScale(x2) - 60;})
-        .attr("y", function(d) {return yScale(y2) - 30;});
-      
-      // display r-square on the chart
-      svg.append("text")
-        .text(`r-sq: ${leastSquaresCoeff[2]}`)
-        .attr("class", "text-label")
-        .attr("x", function(d) {return xScale(x2) - 60;})
-        .attr("y", function(d) {return yScale(y2) - 10;});
-    };
-
 // function used for updating circles group with a transition to
 // new circles
 function renderCircles(circlesGroup, newXScale, newYScale,chosenXaxis,chosenYAxis) {
@@ -172,8 +167,41 @@ function renderCircles(circlesGroup, newXScale, newYScale,chosenXaxis,chosenYAxi
   return circlesGroup;
 }
 
+function renderCirclesText(circlesGroupText, newXScale, newYScale,chosenXaxis,chosenYAxis) {
+
+    circlesGroupText.transition()
+    .duration(1000)
+    .attr("x", d => newXScale(d[chosenXAxis]))
+    .attr("y", d => newYScale(d[chosenYAxis]));
+
+  return circlesGroupText;
+}
+
+function renderTrend(rSquared,trendline,newValues_x,newValues_y,newXScale, newYScale){
+  
+  // var values_x = stateData.map(d => d[chosenXAxis]);
+  // var values_y = stateData.map(d => d[chosenYAxis]);
+  
+  var trendData = calcLinear(newValues_x, newValues_y);
+
+  // display r-square on the chart
+  rSquared.transition()
+  .duration(1000)
+  .text("R-squared: " + trendData[2].toFixed(2));
+
+  var createLine = d3.line()
+  .x(data => newXScale(data["x"]))
+  .y(data => newYScale(data["y"]));
+
+  trendline.transition()
+  .duration(1000)
+  .attr("d", createLine(trendData));
+
+  return [rSquared,trendline];
+}
+
 // function used for updating circles group with new tooltip
-function updateToolTip(chosenXAxis,chosenYAxis, circlesGroup, data) {
+function updateToolTip(chosenXAxis,chosenYAxis, circlesGroup) {
   var xLabel = ''
   var yLabel = ''
   // console.log(chosenXAxis);
@@ -205,7 +233,7 @@ function updateToolTip(chosenXAxis,chosenYAxis, circlesGroup, data) {
 
   var toolTip = d3.tip()
     .attr("class", "tooltip")
-    .offset([85, -60])
+    .offset([85, -90])
     .html(function(d) {
       return (`${d.state}<br>${yLabel}: ${d[chosenYAxis]}<br>${xLabel}: ${d[chosenXAxis]}`);
     });
@@ -217,6 +245,7 @@ function updateToolTip(chosenXAxis,chosenYAxis, circlesGroup, data) {
 
   return circlesGroup;
 }
+
 //Read the data
 d3.csv("assets/data/data.csv").then(function(stateData) {
 
@@ -231,7 +260,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
     });
 
   var xLinearScale = xScale(stateData, chosenXAxis);
-  var yLinearScale = xScale(stateData, chosenYAxis);
+  var yLinearScale = yScale(stateData, chosenYAxis);
 
   // Create initial axis functions
   var bottomAxis = d3.axisBottom(xLinearScale);
@@ -246,6 +275,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
   // append y axis
   var yAxis = chartGroup.append("g")
     .classed("y-axis",true)
+    .attr("transform", `translate(0, 0)`)
     .call(leftAxis);
 
   // append initial circles
@@ -259,10 +289,39 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
     .attr("fill", "#69b3a2")
     .attr("opacity", ".5");
 
-  circlesGroup.append("text")
+  var circlesGroupText = chartGroup.selectAll()
+    .data(stateData)
+    .enter()
+    .append("text")
+    .attr("x", d => xLinearScale(d[chosenXAxis]))
+    .attr("y", d => yLinearScale(d[chosenYAxis]))
     .text(d => d.abbr)
-    .attr("fill","#343a40");  
+    .attr("fill","#343a40")
+    .style("font-size","8px")
+    .style("text-anchor","middle");  
 
+  var values_x = stateData.map(d => d[chosenXAxis]);
+  var values_y = stateData.map(d => d[chosenYAxis]);
+  
+  var trendData = calcLinear(values_x, values_y);
+
+  // display r-square on the chart
+  var rSquared = chartGroup.append("text")
+  .text("R-squared: " + trendData[2].toFixed(2))
+  .attr("class", "text-label")
+  .attr("x", width * .8)
+  .attr("y", height * .05);
+
+  var createLine = d3.line()
+  .x(data => xLinearScale(data["x"]))
+  .y(data => yLinearScale(data["y"]));
+
+  var trendline = chartGroup.append("path")
+  .attr("d", createLine(trendData))
+  .attr("stroke", "black")
+  .attr("stroke-width", "1")
+  .attr("fill", "none");
+  
   // Create group for  3 x- axis labels
   var xLabelsGroup = chartGroup.append("g")
   .attr("transform", `translate(${width / 2}, ${height + 20})`);
@@ -290,7 +349,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
 
   // Create group for  3 y- axis labels
   var yLabelsGroup = chartGroup.append("g")
-  .attr("transform", "rotate(-90)")
+  .attr("transform", "rotate(-90) translate(-100, -8)")
   .attr("y", 0 - margin.left)
   .attr("x", 0 - (height / 2))
   .attr("dy", "1em")
@@ -319,7 +378,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
     .text("Percentage of Smokers");
   // updateToolTip function above csv import
   var circlesGroup = updateToolTip(chosenXAxis, chosenYAxis, circlesGroup,stateData);
-    
+  
   // x axis labels event listener
   xLabelsGroup.selectAll("text")
     .on("click", function() {
@@ -341,9 +400,15 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
 
         // updates circles with new x values
         circlesGroup = renderCircles(circlesGroup, xLinearScale, yLinearScale, chosenXAxis,chosenYAxis);
-        
+        circlesGroupText = renderCirclesText(circlesGroupText, xLinearScale, yLinearScale, chosenXAxis,chosenYAxis);
         // updates tooltips with new info
-        circlesGroup = updateToolTip(chosenXAxis,chosenYAxis, circlesGroup);
+        circlesGroup = updateToolTip(chosenXAxis,chosenYAxis, circlesGroup,circlesGroupText);
+
+        // Update R squared
+        values_x = stateData.map(d => d[chosenXAxis]);
+        values_y = stateData.map(d => d[chosenYAxis]);
+        rSquared = renderTrend(rSquared,trendline,values_x,values_y,xLinearScale, yLinearScale)[0];
+        trendline = renderTrend(rSquared,trendline,values_x,values_y,xLinearScale, yLinearScale)[1];
 
         // changes classes to change bold text
         switch(chosenXAxis){
@@ -403,9 +468,17 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
 
         // updates circles with new y values
         circlesGroup = renderCircles(circlesGroup, xLinearScale, yLinearScale, chosenXAxis,chosenYAxis);
+        circlesGroupText = renderCirclesText(circlesGroupText, xLinearScale, yLinearScale, chosenXAxis,chosenYAxis);
         
         // updates tooltips with new info
         circlesGroup = updateToolTip(chosenXAxis,chosenYAxis, circlesGroup);
+
+        // Update R squared
+        values_x = stateData.map(d => d[chosenXAxis]);
+        values_y = stateData.map(d => d[chosenYAxis]);
+
+        rSquared = renderTrend(rSquared,trendline,values_x,values_y,xLinearScale, yLinearScale)[0];
+        trendline = renderTrend(rSquared,trendline,values_x,values_y,xLinearScale, yLinearScale)[1];
 
         // changes classes to change bold text
         switch(chosenYAxis){
@@ -446,5 +519,4 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
       }
     });
     });
-   trendlineAdd(stateData); 
 });

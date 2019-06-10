@@ -199,6 +199,26 @@ function renderTrend(rSquared, newValues_x, newValues_y) {
     return rSquared;
 }
 
+function buildTable(data) {
+  let tbody = d3.select("tbody");
+  // clear table
+  tbody.html("");
+
+  // Next, loop through each object in the data
+  // and append a row and cells for each value in the row
+  data.forEach((dataRow) => {
+    // Append a row to the table body
+    var row = tbody.append("tr");
+    row.attr("class", "table-primary");
+    // Loop through each field in the dataRow and add
+    // each value as a table cell (td)
+    Object.values(dataRow).forEach((val) => {
+      var cell = row.append("td");
+      cell.text(val);
+    });
+  });
+}
+
 // function used for updating circles group with new tooltip
 function updateToolTip(chosenXAxis, chosenYAxis, circlesGroup) {
     let xLabel = ''
@@ -258,6 +278,9 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
         data.smokes = +data.smokes;
     });
 
+    // populate table
+    buildTable(stateData);
+  
     let xLinearScale = xScale(stateData, chosenXAxis);
     let yLinearScale = yScale(stateData, chosenYAxis);
 

@@ -185,27 +185,18 @@ function renderCirclesText(circlesGroupText, newXScale, newYScale, chosenXaxis, 
     return circlesGroupText;
 }
 
-function renderTrend(rSquared, trendline, newValues_x, newValues_y, newXScale, newYScale) {
+function renderTrend(rSquared, newValues_x, newValues_y) {
 
-    // let values_x = stateData.map(d => d[chosenXAxis]);
-    // let values_y = stateData.map(d => d[chosenYAxis]);
-
-    let trendData = calcLinear(newValues_x, newValues_y);
+ trendData = calcLinear(newValues_x, newValues_y);
 
     // display r-square on the chart
     rSquared.transition()
         .duration(1000)
-        .text("R-squared: " + trendData[2].toFixed(2));
+        .text("R-squared: " + trendData[2].toFixed(2))        
+        .attr("x", width * .8)
+        .attr("y", height * .05);
 
-    let createLine = d3.line()
-        .x(data => newXScale(data["x"]))
-        .y(data => newYScale(data["y"]));
-
-    trendline.transition()
-        .duration(1000)
-        .attr("d", createLine(trendData));
-
-    return [rSquared, trendline];
+    return rSquared;
 }
 
 // function used for updating circles group with new tooltip
@@ -320,16 +311,6 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
         .attr("x", width * .8)
         .attr("y", height * .05);
 
-    let createLine = d3.line()
-        .x(data => xLinearScale(data["x"]))
-        .y(data => yLinearScale(data["y"]));
-
-    let trendline = chartGroup.append("path")
-        .attr("d", createLine(trendData))
-        .attr("stroke", "black")
-        .attr("stroke-width", "1")
-        .attr("fill", "none");
-
     // Create group for  3 x- axis labels
     let xLabelsGroup = chartGroup.append("g")
         .attr("transform", `translate(${width / 2}, ${height + 20})`);
@@ -415,8 +396,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
                 // Update R squared
                 values_x = stateData.map(d => d[chosenXAxis]);
                 values_y = stateData.map(d => d[chosenYAxis]);
-                rSquared = renderTrend(rSquared, trendline, values_x, values_y, xLinearScale, yLinearScale)[0];
-                trendline = renderTrend(rSquared, trendline, values_x, values_y, xLinearScale, yLinearScale)[1];
+                rSquared = renderTrend(rSquared, values_x, values_y);
 
                 // changes classes to change bold text
                 switch (chosenXAxis) {
@@ -485,8 +465,7 @@ d3.csv("assets/data/data.csv").then(function(stateData) {
                         values_x = stateData.map(d => d[chosenXAxis]);
                         values_y = stateData.map(d => d[chosenYAxis]);
 
-                        rSquared = renderTrend(rSquared, trendline, values_x, values_y, xLinearScale, yLinearScale)[0];
-                        trendline = renderTrend(rSquared, trendline, values_x, values_y, xLinearScale, yLinearScale)[1];
+                        rSquared = renderTrend(rSquared, values_x, values_y);
 
                         // changes classes to change bold text
                         switch (chosenYAxis) {
